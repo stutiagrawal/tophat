@@ -11,10 +11,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    index = '/mnt/cinder/SCRATCH/data/grch38/with_decoy/transcriptome_index'
-    genome_annotation = '/mnt/cinder/SCRATCH/data/grch38/with_decoy/gencode.v21.annotation.gtf'
-    bowtie2_build_basename = '/mnt/cinder/SCRATCH/data/grch38/with_decoy/bowtie_2_build'
-    output_dir = '/mnt/cinder/SCRATCH/data/rna_seq_datasets'
+    index = '/mnt/cinder/tmp/data/grch38_tophat/transcriptome_index'
+    genome_annotation = '/mnt/cinder/tmp/data/grch38_tophat/gencode.v21.annotation.gtf'
+    bowtie2_build_basename = '/mnt/cinder/tmp/data/grch38_tophat/bowtie_2_build'
+    output_dir = '/mnt/cinder/tmp/data/rna_seq_datasets'
     cghub_key = '/home/ubuntu/keys/cghub.key'
 
     analysis_handle = open(args.list_of_analysis_id, "r")
