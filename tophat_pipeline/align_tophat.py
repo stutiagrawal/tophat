@@ -18,13 +18,15 @@ def scan_workdir(dirname):
     reads_1 = ""
     reads_2 = ""
     fastq_files = glob.glob(os.path.join(dirname, "*_[12].fastq"))
+    if fastq_files == []:
+        fastq_files = glob.glob(os.path.join(dirname, "*_[12].fastq.gz"))    
     if len(fastq_files) < 2:
         raise Exception("Missing Pair")
 
     for filename in fastq_files:
-        if filename.endswith('_1.fastq'):
+        if filename.endswith('_1.fastq') or filename.endswith('_1.fastq.gz'):
             reads_1 = filename
-        if filename.endswith('_2.fastq'):
+        if filename.endswith('_2.fastq') or filename.endswith('_2.fastq.gz'):
             reads_2 = filename
 
     return reads_1, reads_2
