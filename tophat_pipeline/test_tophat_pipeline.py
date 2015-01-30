@@ -23,11 +23,12 @@ if __name__ == "__main__":
     bowtie2_build_basename = '/home/ubuntu/SCRATCH/grch38/with_decoy/bowtie2_2/bowtie2_buildname'
     output_dir = '/home/ubuntu/SCRATCH/'
     cghub_key = '/home/ubuntu/keys/cghub.key'
-
+    bucket = 's3://bioinformatics_scratch'
     analysis_handle = open(args.list_of_analysis_id, "r")
     for analysis_id in analysis_handle:
         analysis_id = analysis_id.rstrip()
         #retrieve_data(analysis_id, cghub_key, output_dir)
+        download_from_cleversafe(bucket, analysis_id, outdir)
 
         outdir = os.path.join(output_dir, analysis_id)
         tmp_dir = os.path.join(outdir, "tophat_tmp")
