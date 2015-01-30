@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     index = '/home/ubuntu/SCRATCH/grch38/with_decoy/transcriptome_index'
     genome_annotation = '/home/ubuntu/SCRATCH/grch38/gencode.v21.annotation.gtf'
-    bowtie2_build_basename = '/home/ubuntu/SCRATCH/grch38/with_decoy/bowtie2_2/bowtie_2_build'
+    bowtie2_build_basename = '/home/ubuntu/SCRATCH/grch38/with_decoy/bowtie2_2/bowtie2_buildname'
     output_dir = '/home/ubuntu/SCRATCH/'
     cghub_key = '/home/ubuntu/keys/cghub.key'
 
