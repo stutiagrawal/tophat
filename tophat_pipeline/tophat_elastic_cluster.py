@@ -23,8 +23,8 @@ def get_reference_build(bucket, refdir):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog='test_tophat_pipeline.py')
-    parser.add_argument('list_of_analysis_id', help='path to file containing analysis ids')
+    parser = argparse.ArgumentParser(prog='tophat_elastic_cluster.py')
+    parser.add_argument('analysis_id', help='uuid of the analysis')
 
     args = parser.parse_args()
 
@@ -35,22 +35,20 @@ if __name__ == "__main__":
     cghub_key = '/home/ubuntu/keys/cghub.key'
     bucket = 's3://bioinformatics_scratch'
     refdir = '/home/ubuntu/SCRATCH/'
-    analysis_handle = open(args.list_of_analysis_id, "r")
+    analysis_id = args.analysis_id
 
     #download the reference build for tophat
     get_reference_build(bucket, refdir)
-    for analysis_id in analysis_handle:
-        analysis_id = analysis_id.rstrip()
         #retrieve_data(analysis_id, cghub_key, output_dir)
-        #download_from_cleversafe(bucket, analysis_id, output_dir)
+    download_from_cleversafe(bucket, analysis_id, output_dir)
 
-        outdir = os.path.join(output_dir, analysis_id)
-        tmp_dir = os.path.join(outdir, "tophat_tmp")
-        tarfile = ""
-        for filename in os.listdir(outdir):
-            if filename.endswith(".tar") or filename.endswith(".gz") or filename.endswith(".bz"):
-                tarfile = os.path.join(outdir, filename)
-        if tarfile != "":
-            os.system('python align_tophat.py %s %s %s %s %s %s --outdir %s' %(tarfile, index, genome_annotation,
-                                                                tmp_dir, analysis_id, bowtie2_build_basename,
-                                                                outdir))
+    outdir = os.path.join(output_dir, analysis_id)
+    tmp_dir = os.path.join(outdir, "tophat_tmp")
+    tarfile = ""
+    for filename in os.listdir(outdir):
+        if filename.endswith(".tar") or filename.endswith(".gz") or filename.endswith(".bz"):
+            tarfile = os.path.join(outdir, filename)
+    if tarfile != "":
+        os.system('python align_tophat.py %s %s %s %s %s %s --outdir %s' %(tarfile, index, genome_annotation,
+                                                            tmp_dir, analysis_id, bowtie2_build_basename,
+                                                            outdir))
