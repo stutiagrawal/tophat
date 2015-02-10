@@ -7,19 +7,47 @@ import time
 import multiprocessing
 import subprocess
 import glob
+import re
 
 def retrieve_fastq_files(analysis_id, cghub_key, output_dir):
     if not os.path.isdir(os.path.join(output_dir, analysis_id)):
         os.system("gtdownload -v -c %s -p %s %s" %(cghub_key, output_dir, analysis_id))
 
+def scan_workdir_helper(dirname, extension):
+    fastq_files = glob.glob(os.path.join(dirname, "*_[12].%s"%(extension)))
+    all_read_groups = list()
+    read_group_set = dict()
+    if not (fastq_files == []):
+        for filename in fastq_files:
+            rg_id = re.sub(r'_[12].%s$'%(extension), '', filename)
+            read_group_set[rg_id] = read_group_set.get(rg_id, 0) + 1
+        if not all(i == 2 for i in read_group_set.values()):
+            raise Exception("Missing Pair")
+        print read_group_set
+        for rg_id in read_group_set.keys():
+            reads_1 = "%s_1.%s" %(rg_id, extension)
+            reads_2 = "%s_2.%s" %(rg_id, extension)
+            read_pair = (os.path.basename(rg_id), reads_1, reads_2)
+            all_read_groups.append(read_pair)
+
+    return all_read_groups
 def scan_workdir(dirname):
     """ Select the unpacked fastq files """
 
+    print dirname
+    fastq_files = scan_workdir_helper(dirname, "fastq")
+    if fastq_files == []:
+        fastq_files = scan_workdir_helper(dirname, "fastq.gz")
+        if fastq_files == []:
+            fastq_files = scan_workdir_helper(dirname, "fastq.bz")
+    return fastq_files
+
+    """
     reads_1 = ""
     reads_2 = ""
     fastq_files = glob.glob(os.path.join(dirname, "*_[12].fastq"))
     if fastq_files == []:
-        fastq_files = glob.glob(os.path.join(dirname, "*_[12].fastq.gz"))    
+        fastq_files = glob.glob(os.path.join(dirname, "*_[12].fastq.gz"))
     if len(fastq_files) < 2:
         raise Exception("Missing Pair")
 
@@ -30,7 +58,7 @@ def scan_workdir(dirname):
             reads_2 = filename
 
     return reads_1, reads_2
-
+    """
 def decompress(filename, workdir, logger):
     """ Unpack the fastq files """
 
@@ -69,7 +97,7 @@ def tophat_paired(tmp_dir, output_dir, transcriptome_index,
                   bowtie2_build_basename, reads_1, reads_2,
                   picard_path, logger):
     """ Perform tophat on paired end data and fix mate information """
-
+    print "Aligning using TopHat"
     cmd = ['time', '/usr/bin/time', 'tophat2', '-p', '%s' %num_proc,
             '--library-type=fr-unstranded',
             '--segment-length', '20',
@@ -97,14 +125,22 @@ def tophat_paired(tmp_dir, output_dir, transcriptome_index,
             'TMP_DIR=%s' %tmp_dir]
     log_function_time('FIXMATEINFORMATION', analysis_id, cmd, logger)
 
-def downstream_steps(output_dir, analysis_id, logger):
+def downstream_steps(output_dir, analysis_id, read_groups, logger):
     """ merge and sort unmapped reads with mapped reads """
 
-    out_file_basename = os.path.join(output_dir, analysis_id)
-    mapped_reads = os.path.join(output_dir, 'accepted_hits.bam')
-    unmapped_reads = os.path.join(output_dir, 'unmapped.bam')
-    merge_cmd = ['time', '/usr/bin/time', 'samtools', 'merge', '-',
-            mapped_reads, unmapped_reads]
+    out_file_basename = os.path.join(output_dir, analysis_id, analysis_id)
+
+    merge_cmd = ['time', '/usr/bin/time', 'samtools', 'merge', '-',]
+    for rg_id in read_groups:
+        rg_id_dir = os.path.join(output_dir, analysis_id, rg_id)
+        mapped_reads = os.path.join(rg_id_dir, 'accepted_hits.bam')
+        unmapped_reads = os.path.join(rg_id_dir, 'unmapped.bam')
+        if os.path.isfile(mapped_reads):
+            merge_cmd.append(mapped_reads)
+        if os.path.isfile(unmapped_reads):
+            merge_cmd.append(unmapped_reads)
+
+    print merge_cmd
     sort_cmd = ['samtools', 'sort','-', out_file_basename]
     start_time = time.time()
     merge = subprocess.Popen(merge_cmd, stdout=subprocess.PIPE)
@@ -114,7 +150,7 @@ def downstream_steps(output_dir, analysis_id, logger):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='align_tophat.py', description='RNA-seq alignment using TopHat')
-    parser.add_argument('tarfile', help='path to tarfile')
+    #parser.add_argument('tarfile', help='path to tarfile')
     parser.add_argument('index', help='path to index directory')
     parser.add_argument('genome_annotation', help='path to genome annotation file')
     parser.add_argument('tmp_dir', help='path to temporary directory',
@@ -125,28 +161,41 @@ if __name__ == "__main__":
     parser.add_argument('--cghub', help='path to cghub key', default="/home/ubuntu/keys/cghub.key")
     parser.add_argument('--p', help='number of threads', default = int(0.8 * multiprocessing.cpu_count()))
     parser.add_argument('--picard', help='path to picard executable',
-                        default='/home/ubuntu/software/picard-tools-1.128/picard.jar')
+                        default='/home/ubuntu/tools/picard-tools-1.128/picard.jar')
     args = parser.parse_args()
 
-    log_file = "%s.log" % os.path.join(args.outdir, args.analysis_id)
+    log_file = "%s.log" % os.path.join(args.outdir, "%s_1" %args.analysis_id)
 
-    logger = setupLog.setup_logging(logging.INFO, args.analysis_id, log_file)
+    logger = setupLog.setup_logging(logging.INFO, "%s_1" %args.analysis_id, log_file)
     if not os.path.isdir(args.tmp_dir):
         os.mkdir(args.tmp_dir)
     #Unpack the files
-    decompress(args.tarfile, args.outdir, logger)
+    #decompress(args.tarfile, args.outdir, logger)
     #Select the fastq reads
-    reads_1, reads_2 = scan_workdir(args.outdir)
+    read_group_pairs = scan_workdir(os.path.join(args.outdir, args.analysis_id))
+    read_groups = list()
+    print read_group_pairs
     #Perform the paired end alignment
-    tophat_paired(args.tmp_dir, args.outdir, args.index,
-                  args.p, args.genome_annotation, args.analysis_id,
-                  args.bowtie2_build_basename, reads_1, reads_2,
-                  args.picard, logger)
+    start_time = time.time()
+    for (rg_id, reads_1, reads_2) in read_group_pairs:
+        read_groups.append(rg_id)
+        """
+        print rg_id, reads_1, reads_2
+        rg_id_dir = os.path.join(args.outdir, args.analysis_id, rg_id)
+        if not os.path.isdir(rg_id_dir):
+            os.mkdir(rg_id_dir)
+        tophat_paired(args.tmp_dir, rg_id_dir, args.index,
+                    args.p, args.genome_annotation, rg_id,
+                    args.bowtie2_build_basename, reads_1, reads_2,
+                    args.picard, logger)
+    end_time = time.time()
+    """
     #Merge and sort the resulting BAM
-    downstream_steps(args.outdir, args.analysis_id, logger)
+    downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
+    """
     #Remove the reads
-    bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
-    if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
-        os.remove(reads_1)
-        os.remove(reads_2)
-
+        bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
+        if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
+            os.remove(reads_1)
+            os.remove(reads_2)
+    """
