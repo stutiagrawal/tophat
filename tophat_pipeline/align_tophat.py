@@ -172,16 +172,15 @@ if __name__ == "__main__":
     #Unpack the files
     #decompress(args.tarfile, args.outdir, logger)
     #Select the fastq reads
-    read_group_pairs = scan_workdir(os.path.join(args.outdir, args.analysis_id))
+    read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
     print read_group_pairs
     #Perform the paired end alignment
     start_time = time.time()
     for (rg_id, reads_1, reads_2) in read_group_pairs:
         read_groups.append(rg_id)
-        """
         print rg_id, reads_1, reads_2
-        rg_id_dir = os.path.join(args.outdir, args.analysis_id, rg_id)
+        rg_id_dir = os.path.join(args.outdir, rg_id)
         if not os.path.isdir(rg_id_dir):
             os.mkdir(rg_id_dir)
         tophat_paired(args.tmp_dir, rg_id_dir, args.index,
@@ -189,13 +188,12 @@ if __name__ == "__main__":
                     args.bowtie2_build_basename, reads_1, reads_2,
                     args.picard, logger)
     end_time = time.time()
-    """
     #Merge and sort the resulting BAM
     downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
-    """
     #Remove the reads
-        bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
-        if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
-            os.remove(reads_1)
-            os.remove(reads_2)
-    """
+    bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
+    if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
+        for (rg_id, reads_1, reads_2) in read_group_pairs:
+            pass
+            #os.remove(reads_1)
+            #os.remove(reads_2)
