@@ -132,7 +132,7 @@ def downstream_steps(output_dir, analysis_id, read_groups, logger):
 
     merge_cmd = ['time', '/usr/bin/time', 'samtools', 'merge', '-',]
     for rg_id in read_groups:
-        rg_id_dir = os.path.join(output_dir, analysis_id, rg_id)
+        rg_id_dir = os.path.join(output_dir, rg_id)
         mapped_reads = os.path.join(rg_id_dir, 'accepted_hits.bam')
         unmapped_reads = os.path.join(rg_id_dir, 'unmapped.bam')
         if os.path.isfile(mapped_reads):
@@ -175,6 +175,7 @@ if __name__ == "__main__":
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
     print read_group_pairs
+
     #Perform the paired end alignment
     start_time = time.time()
     for (rg_id, reads_1, reads_2) in read_group_pairs:
@@ -188,8 +189,11 @@ if __name__ == "__main__":
                     args.bowtie2_build_basename, reads_1, reads_2,
                     args.picard, logger)
     end_time = time.time()
+    logger.info("TOPTAT_TOTAL\t%s\t%s" %(args.analysis_id, (end_time - start_time)/60.0))
+
     #Merge and sort the resulting BAM
     downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
+
     #Remove the reads
     bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
     if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
