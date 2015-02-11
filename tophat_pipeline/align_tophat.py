@@ -92,38 +92,37 @@ def log_function_time(fn, analysis_id, cmd, logger):
     end_time = time.time()
     logger.info("%s_TIME\t%s\t%s" %(fn, analysis_id,  (end_time - start_time)/60.0))
 
-def tophat_paired(tmp_dir, output_dir, transcriptome_index,
-                  num_proc, genome_annotation, analysis_id,
-                  bowtie2_build_basename, reads_1, reads_2,
-                  picard_path, logger):
+def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger):
     """ Perform tophat on paired end data and fix mate information """
+
     print "Aligning using TopHat"
-    cmd = ['time', '/usr/bin/time', 'tophat2', '-p', '%s' %num_proc,
-            '--library-type=fr-unstranded',
-            '--segment-length', '20',
+
+    cmd = ['time', '/usr/bin/time', 'tophat2', '-p', '%s' %args.p,
+            '--library-type=%s' %args.library_type,
+            '--segment-length', '%s' %args.segment_length,
             '--no-coverage-search',
-            '--min-intron-length', '6',
-            '-G', '%s' %genome_annotation,
-            '--max-multihits','20',
-            '--mate-inner-dist', '350',
-            '--mate-std-dev', '300',
+            '--min-intron-length', '%s' %args.min_intron_length,
+            '-G', args.genome_annotation,
+            '--max-multihits', '%s' %args.max_multihits,
+            '--mate-inner-dist', '%s' %args.mate_inner_dist,
+            '--mate-std-dev', '%s' %args.mate_std_dev,
             '--fusion-search',
-            '--fusion-min-dist', '1000000',
-            '--tmp-dir', tmp_dir,
-            '-o', output_dir,
-            '--transcriptome-index', transcriptome_index,
-            bowtie2_build_basename,
+            '--fusion-min-dist', '%s' %args.fusion_min_dist,
+            '--tmp-dir', args.tmp_dir,
+            '-o', rg_id_dir,
+            '--transcriptome-index', args.transcriptome_index,
+            args.bowtie2_build_basename,
             reads_1, reads_2
             ]
-    log_function_time('TOPHAT', analysis_id, cmd, logger)
+    log_function_time('TOPHAT', args.analysis_id, cmd, logger)
 
     #fix mate information
-    cmd = ['time', '/usr/bin/time', 'java', '-jar', picard_path, 'FixMateInformation',
-            'INPUT=%s' % (os.path.join(output_dir, 'accepted_hits.bam')),
+    cmd = ['time', '/usr/bin/time', 'java', '-jar', args.picard, 'FixMateInformation',
+            'INPUT=%s' % (os.path.join(rg_id_dir, 'accepted_hits.bam')),
             'ASSUME_SORTED=false',
             'VALIDATION_STRINGENCY=LENIENT',
-            'TMP_DIR=%s' %tmp_dir]
-    log_function_time('FIXMATEINFORMATION', analysis_id, cmd, logger)
+            'TMP_DIR=%s' %args.tmp_dir]
+    log_function_time('FIXMATEINFORMATION', rg_id, cmd, logger)
 
 def downstream_steps(output_dir, analysis_id, read_groups, logger):
     """ merge and sort unmapped reads with mapped reads """
@@ -150,18 +149,39 @@ def downstream_steps(output_dir, analysis_id, read_groups, logger):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='align_tophat.py', description='RNA-seq alignment using TopHat')
-    #parser.add_argument('tarfile', help='path to tarfile')
-    parser.add_argument('index', help='path to index directory')
-    parser.add_argument('genome_annotation', help='path to genome annotation file')
-    parser.add_argument('tmp_dir', help='path to temporary directory',
-                        default='/mnt/cinder/SCRATCH/data/top_hat_tmp_dir')
-    parser.add_argument('analysis_id', help='analysis id of the sample')
-    parser.add_argument('bowtie2_build_basename', help='path to bowtie2_build')
-    parser.add_argument('--outdir', help='path to output directory', default=os.getcwd())
-    parser.add_argument('--cghub', help='path to cghub key', default="/home/ubuntu/keys/cghub.key")
-    parser.add_argument('--p', help='number of threads', default = int(0.8 * multiprocessing.cpu_count()))
-    parser.add_argument('--picard', help='path to picard executable',
+    required = parser.add_argument_group("Required input parameters")
+    #required.add_argument('--tarfile', default=None, help='Input file containing sequence information',
+    #                      required=True)
+    required.add_argument('--index', default='/home/ubuntu/SCRATCH/grch38/with_decoy/transcriptome_index',
+                        help='Directory containing the reference genome index', required=True)
+    required.add_argument('--genome_annotation', default='/home/ubuntu/SCRATCH/grch38/gencode.v21.annotation.gtf',
+                        help='path to genome annotation file', required=True)
+    required.add_argument('--analysis_id', help='analysis id of the sample', required=True)
+    required.add_argument('--bowtie2_build_basename', help='path to bowtie2_build', required=True)
+
+    optional = parser.add_argument_group('optional input parameters')
+
+    optional.add_argument('--outdir', help='path to output directory', default=os.getcwd())
+    optional.add_argument('--cghub', help='path to cghub key', default="/home/ubuntu/keys/cghub.key")
+    optional.add_argument('--picard', help='path to picard executable',
                         default='/home/ubuntu/tools/picard-tools-1.128/picard.jar')
+
+    tophat = parser.add_argument_group("TopHat input parameters")
+    tophat.add_argument("--p", type=int, help='No. of threads', default=int(0.8 * multiprocessing.cpu_count()))
+    tophat.add_argument("--segment_length", type=int, help='Length of segment', default=20)
+    tophat.add_argument("--library_type", type=str, help='Type of library', default='fr-unstranded')
+    tophat.add_argument("--no_coverage_search", type=str, help='Coverage search', default='')
+    tophat.add_argument("--min_intron_length", type=int, help='Minimum intron length', default=6)
+    tophat.add_argument("-G", type=str, help='Path to genome annotation file',
+                        default='/home/ubuntu/SCRATCH/grch38/gencode.v21.annotation.gtf')
+    tophat.add_argument("--max_multihits", type=int, help="Maximum multihits", default=20)
+    tophat.add_argument("--mate_inner_dist", type=int, help="Inner mate distance", default=350)
+    tophat.add_argument("--mate_std_dev", type=int, help="Mate standard deviation", default=300)
+    tophat.add_argument("--fusion_search", type=str, help="Search for fusions", default='')
+    tophat.add_argument("--fusion_min_dist", type=str, help="Minimum fusion distance", default=1000000)
+    tophat.add_argument("--tmp_dir", type=str, help="Directory for tmp files", default='/home/ubuntu/SCRATCH/tmp')
+    tophat.add_argument("--transcriptome_index", type=str, help="Directory for transcriptome index",
+                        default='/home/ubuntu/SCRATCH/grch38/with_decoy/transcriptome_index')
     args = parser.parse_args()
 
     log_file = "%s.log" % os.path.join(args.outdir, "%s_1" %args.analysis_id)
@@ -184,15 +204,12 @@ if __name__ == "__main__":
         rg_id_dir = os.path.join(args.outdir, rg_id)
         if not os.path.isdir(rg_id_dir):
             os.mkdir(rg_id_dir)
-        tophat_paired(args.tmp_dir, rg_id_dir, args.index,
-                    args.p, args.genome_annotation, rg_id,
-                    args.bowtie2_build_basename, reads_1, reads_2,
-                    args.picard, logger)
+        tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger)
     end_time = time.time()
     logger.info("TOPTAT_TOTAL\t%s\t%s" %(args.analysis_id, (end_time - start_time)/60.0))
 
     #Merge and sort the resulting BAM
-    downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
+    #downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
 
     #Remove the reads
     bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
