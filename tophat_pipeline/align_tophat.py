@@ -13,6 +13,25 @@ def retrieve_fastq_files(analysis_id, cghub_key, output_dir):
     if not os.path.isdir(os.path.join(output_dir, analysis_id)):
         os.system("gtdownload -v -c %s -p %s %s" %(cghub_key, output_dir, analysis_id))
 
+def fastqc(fastqc_path, reads_1, reads_2, rg_id_dir, analysis_id, logger):
+    fastqc_results = "%s" %(os.path.join(rg_id_dir, "fastqc_results"))
+    if not os.path.isdir(fastqc_results):
+        os.mkdir(fastqc_results)
+    cmd = [fastqc_path, reads_1, reads_2, '--outdir', fastqc_results, '--extract']
+    log_function_time("FastQC", analysis_id, cmd, logger)
+    for dirname in os.listdir(fastqc_results):
+        dirname = os.path.join(fastqc_results, dirname)
+        if os.path.isdir(dirname):
+            dirname = os.path.join(fastqc_results, dirname)
+            for filename in os.listdir(dirname):
+                if filename == "summary.txt":
+                    filename = os.path.join(dirname, filename)
+                    fp = open(filename, "r")
+                    for line in fp:
+                        if not line.startswith("PASS"):
+                            return False
+    return True
+
 def scan_workdir_helper(dirname, extension):
     fastq_files = glob.glob(os.path.join(dirname, "*_[12].%s"%(extension)))
     all_read_groups = list()
@@ -127,7 +146,7 @@ def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger):
 def downstream_steps(output_dir, analysis_id, read_groups, logger):
     """ merge and sort unmapped reads with mapped reads """
 
-    out_file_basename = os.path.join(output_dir, analysis_id, analysis_id)
+    out_file_basename = os.path.join(output_dir, analysis_id)
 
     merge_cmd = ['time', '/usr/bin/time', 'samtools', 'merge', '-',]
     for rg_id in read_groups:
@@ -165,6 +184,7 @@ if __name__ == "__main__":
     optional.add_argument('--cghub', help='path to cghub key', default="/home/ubuntu/keys/cghub.key")
     optional.add_argument('--picard', help='path to picard executable',
                         default='/home/ubuntu/tools/picard-tools-1.128/picard.jar')
+    optional.add_argument('--fastqc_path', help='path to fastqc', default='/home/ubuntu/tools/FastQC/fastqc')
 
     tophat = parser.add_argument_group("TopHat input parameters")
     tophat.add_argument("--p", type=int, help='No. of threads', default=int(0.8 * multiprocessing.cpu_count()))
@@ -187,6 +207,8 @@ if __name__ == "__main__":
     log_file = "%s.log" % os.path.join(args.outdir, "%s_1" %args.analysis_id)
 
     logger = setupLog.setup_logging(logging.INFO, "%s_1" %args.analysis_id, log_file)
+    downstream = False
+
     if not os.path.isdir(args.tmp_dir):
         os.mkdir(args.tmp_dir)
     #Unpack the files
@@ -197,19 +219,22 @@ if __name__ == "__main__":
     print read_group_pairs
 
     #Perform the paired end alignment
-    start_time = time.time()
     for (rg_id, reads_1, reads_2) in read_group_pairs:
         read_groups.append(rg_id)
         print rg_id, reads_1, reads_2
         rg_id_dir = os.path.join(args.outdir, rg_id)
         if not os.path.isdir(rg_id_dir):
             os.mkdir(rg_id_dir)
-        tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger)
-    end_time = time.time()
-    logger.info("TOPTAT_TOTAL\t%s\t%s" %(args.analysis_id, (end_time - start_time)/60.0))
+        if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
+            print "Passed FASTQC"
+            tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger)
+            downstream = True
+        else:
+            logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
 
     #Merge and sort the resulting BAM
-    #downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
+    if downstream == True:
+        downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
 
     #Remove the reads
     bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
