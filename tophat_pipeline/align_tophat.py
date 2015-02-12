@@ -22,7 +22,6 @@ def fastqc(fastqc_path, reads_1, reads_2, rg_id_dir, analysis_id, logger):
     for dirname in os.listdir(fastqc_results):
         dirname = os.path.join(fastqc_results, dirname)
         if os.path.isdir(dirname):
-            dirname = os.path.join(fastqc_results, dirname)
             for filename in os.listdir(dirname):
                 if filename == "summary.txt":
                     filename = os.path.join(dirname, filename)
