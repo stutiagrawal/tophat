@@ -255,12 +255,12 @@ if __name__ == "__main__":
         rg_id_dir = os.path.join(args.outdir, rg_id)
         if not os.path.isdir(rg_id_dir):
             os.mkdir(rg_id_dir)
-        #if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
+        if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
             print "Passed FASTQC"
-        tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger)
-        downstream = True
-        #else:
-        #    logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
+            tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger)
+            downstream = True
+        else:
+            logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
 
     #Merge and sort the resulting BAM
     if downstream == True:
