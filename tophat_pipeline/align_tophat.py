@@ -8,10 +8,55 @@ import multiprocessing
 import subprocess
 import glob
 import re
+import xml.etree.ElementTree as ET
 
 def retrieve_fastq_files(analysis_id, cghub_key, output_dir):
     if not os.path.isdir(os.path.join(output_dir, analysis_id)):
         os.system("gtdownload -v -c %s -p %s %s" %(cghub_key, output_dir, analysis_id))
+
+def get_xml(dirname, analysis_id, logger):
+
+    print "Downloading XML"
+    print "Analysis ID = %s" % analysis_id
+    xml_file = "%s.xml" %os.path.join(dirname, analysis_id)
+    cmd = ['cgquery', '-o' , xml_file, 'analysis_id=%s' %analysis_id]
+    log_function_time('cgquery', analysis_id, cmd, logger)
+
+    return xml_file
+
+def get_value_from_tree(result, field):
+    if not (result == None):
+        if not (result.find(str(field)) == None):
+            field_value = result.find(str(field)).text
+            if field_value == None:
+                return ""
+            else:
+                return field_value
+    else:
+        raise Exception("Empty result from XML")
+
+def extract_metadata(dirname, analysis_id, logger):
+
+    #Download the xmd file
+    xml_file = get_xml(dirname, analysis_id, logger)
+
+    #Parse XML to get required fields
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+    metadata = dict()
+    for result in root.iter("Result"):
+        metadata["participant_id"] = get_value_from_tree(result, "participant_id")
+        metadata["sample_id"] = get_value_from_tree(result, "sample_id")
+        metadata["disease"] = get_value_from_tree(result, "disease")
+        metadata["tss_id"] = get_value_from_tree(result, "tss_id")
+        metadata["library_strategy"] = get_value_from_tree(result, "library_strategy")
+        metadata["analyte_code"] = get_value_from_tree(result, "analyte_code")
+        metadata["sample_type"] = get_value_from_tree(result, "sample_type")
+        metadata["platform"] = get_value_from_tree(result, "platform")
+        metadata["aliquot_id"] = get_value_from_tree(result, "aliquot_id")
+
+    os.remove(xml_file)
+    return metadata
 
 def fastqc(fastqc_path, reads_1, reads_2, rg_id_dir, analysis_id, logger):
     fastqc_results = "%s" %(os.path.join(rg_id_dir, "fastqc_results"))
@@ -60,23 +105,6 @@ def scan_workdir(dirname):
             fastq_files = scan_workdir_helper(dirname, "fastq.bz")
     return fastq_files
 
-    """
-    reads_1 = ""
-    reads_2 = ""
-    fastq_files = glob.glob(os.path.join(dirname, "*_[12].fastq"))
-    if fastq_files == []:
-        fastq_files = glob.glob(os.path.join(dirname, "*_[12].fastq.gz"))
-    if len(fastq_files) < 2:
-        raise Exception("Missing Pair")
-
-    for filename in fastq_files:
-        if filename.endswith('_1.fastq') or filename.endswith('_1.fastq.gz'):
-            reads_1 = filename
-        if filename.endswith('_2.fastq') or filename.endswith('_2.fastq.gz'):
-            reads_2 = filename
-
-    return reads_1, reads_2
-    """
 def decompress(filename, workdir, logger):
     """ Unpack the fastq files """
 
@@ -110,7 +138,7 @@ def log_function_time(fn, analysis_id, cmd, logger):
     end_time = time.time()
     logger.info("%s_TIME\t%s\t%s" %(fn, analysis_id,  (end_time - start_time)/60.0))
 
-def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger):
+def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
     """ Perform tophat on paired end data and fix mate information """
 
     print "Aligning using TopHat"
@@ -129,6 +157,8 @@ def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger):
             '--tmp-dir', args.tmp_dir,
             '-o', rg_id_dir,
             '--transcriptome-index', args.transcriptome_index,
+            '--rg-id', rg_id,
+            '--rg-sample', metadata["sample_id"],
             args.bowtie2_build_basename,
             reads_1, reads_2
             ]
@@ -216,7 +246,8 @@ if __name__ == "__main__":
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
     print read_group_pairs
-
+    metadata = extract_metadata(args.outdir, args.analysis_id, logger)
+    print metadata
     #Perform the paired end alignment
     for (rg_id, reads_1, reads_2) in read_group_pairs:
         read_groups.append(rg_id)
@@ -224,12 +255,12 @@ if __name__ == "__main__":
         rg_id_dir = os.path.join(args.outdir, rg_id)
         if not os.path.isdir(rg_id_dir):
             os.mkdir(rg_id_dir)
-        if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
+        #if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
             print "Passed FASTQC"
-            tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger)
-            downstream = True
-        else:
-            logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
+        tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger)
+        downstream = True
+        #else:
+        #    logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
 
     #Merge and sort the resulting BAM
     if downstream == True:
