@@ -198,8 +198,8 @@ def downstream_steps(output_dir, analysis_id, read_groups, logger):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='align_tophat.py', description='RNA-seq alignment using TopHat')
     required = parser.add_argument_group("Required input parameters")
-    #required.add_argument('--tarfile', default=None, help='Input file containing sequence information',
-    #                      required=True)
+    required.add_argument('--tarfile', default=None, help='Input file containing sequence information',
+                          required=True)
     required.add_argument('--index', default='/home/ubuntu/SCRATCH/grch38/with_decoy/transcriptome_index',
                         help='Directory containing the reference genome index', required=True)
     required.add_argument('--genome_annotation', default='/home/ubuntu/SCRATCH/grch38/gencode.v21.annotation.gtf',
@@ -241,7 +241,7 @@ if __name__ == "__main__":
     if not os.path.isdir(args.tmp_dir):
         os.mkdir(args.tmp_dir)
     #Unpack the files
-    #decompress(args.tarfile, args.outdir, logger)
+    decompress(args.tarfile, args.outdir, logger)
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
@@ -255,12 +255,12 @@ if __name__ == "__main__":
         rg_id_dir = os.path.join(args.outdir, rg_id)
         if not os.path.isdir(rg_id_dir):
             os.mkdir(rg_id_dir)
-        if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
-            print "Passed FASTQC"
-            tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger)
-            downstream = True
-        else:
-            logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
+        #if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
+        #    print "Passed FASTQC"
+        tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger)
+        #    downstream = True
+        #else:
+        #    logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
 
     #Merge and sort the resulting BAM
     if downstream == True:
