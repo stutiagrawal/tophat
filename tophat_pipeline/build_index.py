@@ -12,7 +12,11 @@ if __name__ == "__main__":
 
     print 'Starting TopHat build'
 
+<<<<<<< HEAD
     #os.system('bowtie2-build --offrate 3 %s %s' %(args.ref, args.bowtie_buildname))
+=======
+    os.system('bowtie2-build --offrate 3 %s %s' %(args.ref, args.bowtie_buildname))
+>>>>>>> 4ac4560e434225683b946f91420e242976007270
     if not os.path.isdir(args.transcriptome):
         os.mkdir(args.transcriptome)
     os.system('tophat2 -G %s --transcriptome-index %s %s' %(args.gtf, args.transcriptome, args.bowtie_buildname))

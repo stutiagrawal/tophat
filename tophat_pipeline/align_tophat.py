@@ -164,6 +164,17 @@ def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
             ]
     log_function_time('TOPHAT', args.analysis_id, cmd, logger)
 
+<<<<<<< HEAD
+=======
+    #fix mate information
+    cmd = ['time', '/usr/bin/time', 'java', '-jar', args.picard, 'FixMateInformation',
+            'INPUT=%s' % (os.path.join(rg_id_dir, 'accepted_hits.bam')),
+            'ASSUME_SORTED=false',
+            'VALIDATION_STRINGENCY=LENIENT',
+            'TMP_DIR=%s' %args.tmp_dir]
+    log_function_time('FIXMATEINFORMATION', rg_id, cmd, logger)
+
+>>>>>>> 4ac4560e434225683b946f91420e242976007270
 def downstream_steps(output_dir, analysis_id, read_groups, logger):
     """ merge and sort unmapped reads with mapped reads """
 
@@ -237,7 +248,13 @@ if __name__ == "__main__":
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
+<<<<<<< HEAD
     metadata = extract_metadata(args.outdir, args.analysis_id, logger)
+=======
+    print read_group_pairs
+    metadata = extract_metadata(args.outdir, args.analysis_id, logger)
+    print metadata
+>>>>>>> 4ac4560e434225683b946f91420e242976007270
     #Perform the paired end alignment
     for (rg_id, reads_1, reads_2) in read_group_pairs:
         read_groups.append(rg_id)
