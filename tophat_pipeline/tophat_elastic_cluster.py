@@ -1,5 +1,6 @@
 import os
 import argparse
+import pipelineUtil
 
 def retrieve_data(analysis_id, cghub_key, output_dir):
     if not os.path.isdir(os.path.join(output_dir, analysis_id)):
@@ -24,6 +25,23 @@ def get_reference_build(bucket, refdir):
         print transcriptome
         if not os.path.isfile(gtf) or not os.path.isdir(bowtie) or not  os.path.isdir(transcriptome):
             print "Cannot get reference genome"
+
+def upload_important_files(bucket, dirname):
+    for entity in os.listdir(dirname):
+        entity_path = os.path.join(dirname, entity)
+        if entity.endswith(".log"):
+            entity_out_path = os.path.join(bucket, 'rna_seq_logs', entity)
+            pipelineUtil.upload_to_cleversafe(None, entity_out_path, entity_path)
+        if os.path.isdir(entity_path):
+            read_group = entity
+            mate_1_in = os.path.join(entity_path, "fastqc_results", "%s_1_fastqc" %(read_group), "summary.txt")
+            mate_1_out = os.path.join(bucket, "fastqc", analysis_id, "%s_1" %read_group)
+            mate_2_in = os.path.join(entity_path, "fastqc_results", "%s_2_fastqc" %(read_group), "summary.txt")
+            mate_2_out = os.path.join(bucket, "fastqc", analysis_id, "%s_2" %read_group)
+            if (os.path.isfile(mate_1_in) and os.path.isfile(mate_2_in)):
+                pipelineUtil.upload_to_cleversafe(None, mate_1_out, mate_1_in)
+                pipelineUtil.upload_to_cleversafe(None, mate_2_out, mate_2_in)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='tophat_elastic_cluster.py')
@@ -53,6 +71,7 @@ if __name__ == "__main__":
             tarfile = os.path.join(outdir, filename)
     if tarfile != "":
         print tarfile
-        os.system('python /home/ubuntu/tophat/tophat_pipeline/align_tophat.py --tarfile %s --index %s --genome_annotation %s --tmp_dir %s --analysis_id %s --bowtie2_build_basename %s --outdir %s'
-                %(tarfile, index, genome_annotation, tmp_dir, analysis_id, bowtie2_build_basename,
-                outdir))
+#        os.system('python /home/ubuntu/tophat/tophat_pipeline/align_tophat.py --tarfile %s --index %s --genome_annotation %s --tmp_dir %s --analysis_id %s --bowtie2_build_basename %s --outdir %s'
+#                %(tarfile, index, genome_annotation, tmp_dir, analysis_id, bowtie2_build_basename,
+#                outdir))
+        upload_important_files(bucket, outdir)

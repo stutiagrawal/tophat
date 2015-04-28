@@ -1,4 +1,4 @@
-import runBashCmd
+import pipelineUtil
 import logging
 import argparse
 import os
@@ -9,6 +9,7 @@ import subprocess
 import glob
 import re
 import xml.etree.ElementTree as ET
+import qc
 
 def retrieve_fastq_files(analysis_id, cghub_key, output_dir):
     if not os.path.isdir(os.path.join(output_dir, analysis_id)):
@@ -20,7 +21,7 @@ def get_xml(dirname, analysis_id, logger):
     print "Analysis ID = %s" % analysis_id
     xml_file = "%s.xml" %os.path.join(dirname, analysis_id)
     cmd = ['cgquery', '-o' , xml_file, 'analysis_id=%s' %analysis_id]
-    log_function_time('cgquery', analysis_id, cmd, logger)
+    pipelineUtil.log_function_time('cgquery', analysis_id, cmd, logger)
 
     return xml_file
 
@@ -37,7 +38,7 @@ def get_value_from_tree(result, field):
 
 def extract_metadata(dirname, analysis_id, logger):
 
-    #Download the xmd file
+    #Download the xml file
     xml_file = get_xml(dirname, analysis_id, logger)
 
     #Parse XML to get required fields
@@ -58,24 +59,6 @@ def extract_metadata(dirname, analysis_id, logger):
     os.remove(xml_file)
     return metadata
 
-def fastqc(fastqc_path, reads_1, reads_2, rg_id_dir, analysis_id, logger):
-    fastqc_results = "%s" %(os.path.join(rg_id_dir, "fastqc_results"))
-    if not os.path.isdir(fastqc_results):
-        os.mkdir(fastqc_results)
-    cmd = [fastqc_path, reads_1, reads_2, '--outdir', fastqc_results, '--extract']
-    log_function_time("FastQC", analysis_id, cmd, logger)
-    for dirname in os.listdir(fastqc_results):
-        dirname = os.path.join(fastqc_results, dirname)
-        if os.path.isdir(dirname):
-            for filename in os.listdir(dirname):
-                if filename == "summary.txt":
-                    filename = os.path.join(dirname, filename)
-                    fp = open(filename, "r")
-                    for line in fp:
-                        if not line.startswith("PASS"):
-                            return False
-    return True
-
 def scan_workdir_helper(dirname, extension):
     fastq_files = glob.glob(os.path.join(dirname, "*_[12].%s"%(extension)))
     all_read_groups = list()
@@ -94,6 +77,7 @@ def scan_workdir_helper(dirname, extension):
             all_read_groups.append(read_pair)
 
     return all_read_groups
+
 def scan_workdir(dirname):
     """ Select the unpacked fastq files """
 
@@ -117,26 +101,27 @@ def decompress(filename, workdir, logger):
         cmd = ['tar', 'xvjf', filename, '-C', workdir]
     else:
         raise Exception('Unknown input file extension for file %s' % filename)
-    run_command(cmd, logger)
+    pipelineUtil.run_command(cmd, logger)
 
-def run_command(cmd, logger):
-    """ Run a subprocess command """
-
-    stdoutdata, stderrdata = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-    stdoutdata = stdoutdata.split("\n")
-    for line in stdoutdata:
-        logger.info(line)
-    stderrdata = stderrdata.split("\n")
-    for line in stderrdata:
-        logger.info(line)
-
-def log_function_time(fn, analysis_id, cmd, logger):
-    """ Log the time taken by a command to the logger """
-
-    start_time = time.time()
-    run_command(cmd, logger)
-    end_time = time.time()
-    logger.info("%s_TIME\t%s\t%s" %(fn, analysis_id,  (end_time - start_time)/60.0))
+#def run_command(cmd, logger):
+#    """ Run a subprocess command """
+#
+#    stdoutdata, stderrdata = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+#    stdoutdata = stdoutdata.split("\n")
+#    for line in stdoutdata:
+#        logger.info(line)
+#    stderrdata = stderrdata.split("\n")
+#    for line in stderrdata:
+#        logger.info(line)
+#
+#def log_function_time(fn, analysis_id, cmd, logger):
+#    """ Log the time taken by a command to the logger """
+#
+#    start_time = time.time()
+#    run_command(cmd, logger)
+#    end_time = time.time()
+#    logger.info("%s_TIME\t%s\t%s" %(fn, analysis_id,  (end_time - start_time)/60.0))
+#"""
 
 def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
     """ Perform tophat on paired end data and fix mate information """
@@ -162,7 +147,7 @@ def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
             args.bowtie2_build_basename,
             reads_1, reads_2
             ]
-    log_function_time('TOPHAT', args.analysis_id, cmd, logger)
+    pipelineUtil.log_function_time('TOPHAT', args.analysis_id, cmd, logger)
 
 def downstream_steps(output_dir, analysis_id, read_groups, logger):
     """ merge and sort unmapped reads with mapped reads """
@@ -205,7 +190,7 @@ if __name__ == "__main__":
     optional.add_argument('--cghub', help='path to cghub key', default="/home/ubuntu/keys/cghub.key")
     optional.add_argument('--picard', help='path to picard executable',
                         default='/home/ubuntu/tools/picard-tools-1.128/picard.jar')
-    optional.add_argument('--fastqc_path', help='path to fastqc', default='/home/ubuntu/tools/FastQC/fastqc')
+    optional.add_argument('--fastqc_path', help='path to fastqc', default='/home/ubuntu/bin/FastQC/fastqc')
 
     tophat = parser.add_argument_group("TopHat input parameters")
     tophat.add_argument("--p", type=int, help='No. of threads', default=int(0.8 * multiprocessing.cpu_count()))
@@ -228,16 +213,18 @@ if __name__ == "__main__":
     log_file = "%s.log" % os.path.join(args.outdir, "%s_1" %args.analysis_id)
 
     logger = setupLog.setup_logging(logging.INFO, "%s_1" %args.analysis_id, log_file)
-    downstream = False
 
     if not os.path.isdir(args.tmp_dir):
         os.mkdir(args.tmp_dir)
+
     #Unpack the files
     decompress(args.tarfile, args.outdir, logger)
+
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
     metadata = extract_metadata(args.outdir, args.analysis_id, logger)
+
     #Perform the paired end alignment
     for (rg_id, reads_1, reads_2) in read_group_pairs:
         read_groups.append(rg_id)
@@ -245,17 +232,14 @@ if __name__ == "__main__":
         rg_id_dir = os.path.join(args.outdir, rg_id)
         if not os.path.isdir(rg_id_dir):
             os.mkdir(rg_id_dir)
-        #if fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger):
+        qc.fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger)
         #    print "Passed FASTQC"
         tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger)
-        downstream = True
         #else:
         #    logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
 
     #Merge and sort the resulting BAM
-    if downstream == True:
-        downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
-
+    downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
     #Remove the reads
     bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
     if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
