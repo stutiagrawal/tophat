@@ -11,10 +11,6 @@ import re
 import xml.etree.ElementTree as ET
 import qc
 
-def retrieve_fastq_files(analysis_id, cghub_key, output_dir):
-    if not os.path.isdir(os.path.join(output_dir, analysis_id)):
-        os.system("gtdownload -v -c %s -p %s %s" %(cghub_key, output_dir, analysis_id))
-
 def get_xml(dirname, analysis_id, logger):
 
     print "Downloading XML"
@@ -89,7 +85,7 @@ def scan_workdir(dirname):
             fastq_files = scan_workdir_helper(dirname, "fastq.bz")
     return fastq_files
 
-def decompress(filename, workdir, logger):
+def decompress(filename, workdir, analysis_id, logger):
     """ Unpack the fastq files """
 
     if filename.endswith(".tar"):
@@ -101,27 +97,8 @@ def decompress(filename, workdir, logger):
         cmd = ['tar', 'xvjf', filename, '-C', workdir]
     else:
         raise Exception('Unknown input file extension for file %s' % filename)
-    pipelineUtil.run_command(cmd, logger)
+    pipelineUtil.log_function_time("tar", analysis_id, cmd, logger)
 
-#def run_command(cmd, logger):
-#    """ Run a subprocess command """
-#
-#    stdoutdata, stderrdata = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-#    stdoutdata = stdoutdata.split("\n")
-#    for line in stdoutdata:
-#        logger.info(line)
-#    stderrdata = stderrdata.split("\n")
-#    for line in stderrdata:
-#        logger.info(line)
-#
-#def log_function_time(fn, analysis_id, cmd, logger):
-#    """ Log the time taken by a command to the logger """
-#
-#    start_time = time.time()
-#    run_command(cmd, logger)
-#    end_time = time.time()
-#    logger.info("%s_TIME\t%s\t%s" %(fn, analysis_id,  (end_time - start_time)/60.0))
-#"""
 
 def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
     """ Perform tophat on paired end data and fix mate information """
@@ -218,7 +195,7 @@ if __name__ == "__main__":
         os.mkdir(args.tmp_dir)
 
     #Unpack the files
-    decompress(args.tarfile, args.outdir, logger)
+    decompress(args.tarfile, args.outdir, args.analysis_id, logger)
 
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
