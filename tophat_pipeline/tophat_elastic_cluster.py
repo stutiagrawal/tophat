@@ -26,7 +26,7 @@ def get_reference_build(bucket, refdir):
         if not os.path.isfile(gtf) or not os.path.isdir(bowtie) or not  os.path.isdir(transcriptome):
             print "Cannot get reference genome"
 
-def uplaod_fastqc(bucket, entity_path, read_group, analysis_id, filename):
+def upload_fastqc(bucket, entity_path, read_group, analysis_id, filename):
 
     mate_1_in = os.path.join(entity_path, "fastqc_results", "%s_1_fastqc" %(read_group),"%s.txt" %filename)
     mate_1_out = os.path.join(bucket, "fastqc_%s"%filename, analysis_id, "%s_1" %read_group)
@@ -49,8 +49,8 @@ def upload_important_files(bucket, dirname, args):
             pipelineUtil.upload_to_cleversafe(None, bam_out_path, bam_in_path)
         if os.path.isdir(entity_path):
             read_group = entity
-            upload_fastqc("summary")
-            upload_fastqc("fastqc_data")
+            upload_fastqc(bucket, entity_path, read_group, args.analysis_id, "summary")
+            upload_fastqc(bucket, entity_path, read_group, args.analysis_id, "fastqc_data")
 
             alignment_summary = os.path.join(entity_path, "align_summary.txt")
             alignment_summary_out = os.path.join(bucket, "tophat_summary", "%s_%s.txt" %(args.analysis_id, read_group))
@@ -84,8 +84,8 @@ if __name__ == "__main__":
             tarfile = os.path.join(outdir, filename)
     if tarfile != "":
         print tarfile
-        os.system('python /home/ubuntu/tophat/tophat_pipeline/align_tophat.py --tarfile %s --index %s --genome_annotation %s --tmp_dir %s --analysis_id %s --bowtie2_build_basename %s --outdir %s'
-                %(tarfile, index, genome_annotation, tmp_dir, analysis_id, bowtie2_build_basename,
-                outdir))
+        #os.system('python /home/ubuntu/tophat/tophat_pipeline/align_tophat.py --tarfile %s --index %s --genome_annotation %s --tmp_dir %s --analysis_id %s --bowtie2_build_basename %s --outdir %s'
+         #       %(tarfile, index, genome_annotation, tmp_dir, analysis_id, bowtie2_build_basename,
+         #       outdir))
         upload_important_files(bucket, outdir, args)
         pipelineUtil.remove_dir(outdir)
