@@ -84,8 +84,8 @@ if __name__ == "__main__":
             tarfile = os.path.join(outdir, filename)
     if tarfile != "":
         print tarfile
-        #os.system('python /home/ubuntu/tophat/tophat_pipeline/align_tophat.py --tarfile %s --index %s --genome_annotation %s --tmp_dir %s --analysis_id %s --bowtie2_build_basename %s --outdir %s'
-         #       %(tarfile, index, genome_annotation, tmp_dir, analysis_id, bowtie2_build_basename,
-         #       outdir))
+        os.system('python /home/ubuntu/tophat/tophat_pipeline/align_tophat.py --tarfile %s --index %s --genome_annotation %s --tmp_dir %s --analysis_id %s --bowtie2_build_basename %s --outdir %s'
+                %(tarfile, index, genome_annotation, tmp_dir, analysis_id, bowtie2_build_basename,
+                outdir))
         upload_important_files(bucket, outdir, args)
         pipelineUtil.remove_dir(outdir)
