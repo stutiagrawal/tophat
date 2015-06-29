@@ -32,10 +32,10 @@ def get_value_from_tree(result, field):
     else:
         raise Exception("Empty result from XML")
 
-def extract_metadata(dirname, analysis_id, logger):
+def extract_metadata(dirname, xml_file, logger):
 
     #Download the xml file
-    xml_file = get_xml(dirname, analysis_id, logger)
+    #xml_file = get_xml(dirname, analysis_id, logger)
 
     #Parse XML to get required fields
     tree = ET.parse(xml_file)
@@ -160,6 +160,7 @@ if __name__ == "__main__":
                         help='path to genome annotation file', required=True)
     required.add_argument('--analysis_id', help='analysis id of the sample', required=True)
     required.add_argument('--bowtie2_build_basename', help='path to bowtie2_build', required=True)
+    required.add_argument('--metadata_xml', help='metadata in XML format as given by cgquery', required=True)
 
     optional = parser.add_argument_group('optional input parameters')
 
@@ -200,7 +201,7 @@ if __name__ == "__main__":
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
-    metadata = extract_metadata(args.outdir, args.analysis_id, logger)
+    metadata = extract_metadata(args.outdir, args.metadata_xml, logger)
 
     #Perform the paired end alignment
     for (rg_id, reads_1, reads_2) in read_group_pairs:
