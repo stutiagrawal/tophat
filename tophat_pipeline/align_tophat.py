@@ -124,7 +124,7 @@ def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
             args.bowtie2_build_basename,
             reads_1, reads_2
             ]
-    pipelineUtil.log_function_time('TOPHAT', args.analysis_id, cmd, logger)
+    pipelineUtil.log_function_time('TOPHAT', args.id, cmd, logger)
 
 def downstream_steps(output_dir, analysis_id, read_groups, logger):
     """ merge and sort unmapped reads with mapped reads """
@@ -158,12 +158,11 @@ if __name__ == "__main__":
                         help='Directory containing the reference genome index', required=True)
     required.add_argument('--genome_annotation', default='/home/ubuntu/SCRATCH/grch38/gencode.v21.annotation.gtf',
                         help='path to genome annotation file', required=True)
-    required.add_argument('--analysis_id', help='analysis id of the sample', required=True)
     required.add_argument('--bowtie2_build_basename', help='path to bowtie2_build', required=True)
     required.add_argument('--metadata_xml', help='metadata in XML format as given by cgquery', required=True)
 
     optional = parser.add_argument_group('optional input parameters')
-
+    optional.add_argument('--id', help='id of the sample', default="test")
     optional.add_argument('--outdir', help='path to output directory', default=os.getcwd())
     optional.add_argument('--cghub', help='path to cghub key', default="/home/ubuntu/keys/cghub.key")
     optional.add_argument('--picard', help='path to picard executable',
@@ -188,15 +187,15 @@ if __name__ == "__main__":
                         default='/home/ubuntu/SCRATCH/grch38/with_decoy/transcriptome_index')
     args = parser.parse_args()
 
-    log_file = "%s.log" % os.path.join(args.outdir, "%s_1" %args.analysis_id)
+    log_file = "%s.log" % os.path.join(args.outdir, "%s_1" %args.id)
 
-    logger = setupLog.setup_logging(logging.INFO, "%s_1" %args.analysis_id, log_file)
+    logger = setupLog.setup_logging(logging.INFO, "%s_1" %args.id, log_file)
 
     if not os.path.isdir(args.tmp_dir):
         os.mkdir(args.tmp_dir)
 
     #Unpack the files
-    decompress(args.tarfile, args.outdir, args.analysis_id, logger)
+    decompress(args.tarfile, args.outdir, args.id, logger)
 
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
@@ -217,9 +216,9 @@ if __name__ == "__main__":
         #    logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
 
     #Merge and sort the resulting BAM
-    downstream_steps(args.outdir, args.analysis_id, read_groups, logger)
+    downstream_steps(args.outdir, args.id, read_groups, logger)
     #Remove the reads
-    bam_file_name = "%s.bam" % os.path.join(args.outdir, args.analysis_id)
+    bam_file_name = "%s.bam" % os.path.join(args.outdir, args.id)
     if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
         for (rg_id, reads_1, reads_2) in read_group_pairs:
             pass
