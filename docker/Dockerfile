@@ -23,7 +23,10 @@ RUN apt-get update && apt-get install -y --force-yes \
     s3cmd \
     time \
     wget \
-    python-virtualenv
+    samtools \
+    python-virtualenv \
+    default-jre \
+    default-jdk
 
 RUN adduser --disabled-password --gecos '' ubuntu && adduser ubuntu sudo && echo "ubuntu    ALL=(ALL)   NOPASSWD:ALL" >> /etc/sudoers.d/ubuntu
 ENV HOME /home/ubuntu
@@ -47,12 +50,16 @@ RUN wget http://ccb.jhu.edu/software/tophat/downloads/tophat-2.0.13.Linux_x86_64
 #remove the compressed files
 && rm *.gz *.zip
 
+ENV PATH ${PATH}:${HOME}/bin/FastQC:${HOME}/bin/tophat-2.0.13.Linux_x86_64:${HOME}/bin/bowtie2-2.2.2
 USER root
 RUN dpkg -i --force-depends ${HOME}/bin/genetorrent-*.deb \
     && apt-get update \
     && apt-get -f install -y
 
 RUN pip install s3cmd --user
-ENV rna_seq 0.02
+ENV rna_seq 0.03
+WORKDIR ${HOME}
 RUN git clone https://github.com/stutiagrawal/tophat.git
+WORKDIR ${HOME}/bin
+
 ENTRYPOINT ["/bin/bash", "-c"]
