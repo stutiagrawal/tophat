@@ -35,20 +35,20 @@ RUN mkdir ${HOME}/bin
 WORKDIR ${HOME}/bin
 
 #install TopHat 2.0.13
-RUN wget http://ccb.jhu.edu/software/tophat/downloads/tophat-2.0.13.Linux_x86_64.tar.gz && tar xzvf tophat-2.0.13.Linux_x86_64.tar.gz \
+RUN wget http://ccb.jhu.edu/software/tophat/downloads/tophat-2.0.13.Linux_x86_64.tar.gz && tar xzvf tophat-2.0.13.Linux_x86_64.tar.gz 
 
 #install Bowtie2-2.2.2
-&& wget http://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.2.2/bowtie2-2.2.2-linux-x86_64.zip && unzip bowtie2-2.2.2-linux-x86_64.zip \
+RUN wget http://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.2.2/bowtie2-2.2.2-linux-x86_64.zip && unzip bowtie2-2.2.2-linux-x86_64.zip 
 
 #install FastQC 0.11.2
-&& wget http://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.2.zip && unzip fastqc_v0.11.2.zip && chmod +x FastQC/fastqc \
+RUN wget http://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.2.zip && unzip fastqc_v0.11.2.zip && chmod +x FastQC/fastqc 
 
 #download genetorrent
-&& wget https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb \
-&& wget https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb \
+RUN wget https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-common_3.8.7-ubuntu2.207-14.04_amd64.deb \
+&& wget https://cghub.ucsc.edu/software/downloads/GeneTorrent/3.8.7/genetorrent-download_3.8.7-ubuntu2.207-14.04_amd64.deb 
 
 #remove the compressed files
-&& rm *.gz *.zip
+RUN rm *.gz *.zip
 
 ENV PATH ${PATH}:${HOME}/bin/FastQC:${HOME}/bin/tophat-2.0.13.Linux_x86_64:${HOME}/bin/bowtie2-2.2.2
 USER root
@@ -57,9 +57,8 @@ RUN dpkg -i --force-depends ${HOME}/bin/genetorrent-*.deb \
     && apt-get -f install -y
 
 RUN pip install s3cmd --user
-ENV rna_seq 0.03
+ENV rna_seq 0.04
 WORKDIR ${HOME}
 RUN git clone https://github.com/stutiagrawal/tophat.git
 WORKDIR ${HOME}/bin
 
-ENTRYPOINT ["/bin/bash", "-c"]
