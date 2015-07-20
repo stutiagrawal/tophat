@@ -100,7 +100,7 @@ def decompress(filename, workdir, analysis_id, logger):
     pipelineUtil.log_function_time("tar", analysis_id, cmd, logger)
 
 
-def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
+def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, logger):
     """ Perform tophat on paired end data and fix mate information """
 
     print "Aligning using TopHat"
@@ -120,7 +120,7 @@ def tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger):
             '-o', rg_id_dir,
             '--transcriptome-index', args.transcriptome_index,
             '--rg-id', rg_id,
-            '--rg-sample', metadata["sample_id"],
+            '--rg-sample', args.sample_id,
             args.bowtie2_build_basename,
             reads_1, reads_2
             ]
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     required.add_argument('--genome_annotation', default='/home/ubuntu/SCRATCH/grch38/gencode.v21.annotation.gtf',
                         help='path to genome annotation file', required=True)
     required.add_argument('--bowtie2_build_basename', help='path to bowtie2_build', required=True)
-    required.add_argument('--metadata_xml', help='metadata in XML format as given by cgquery', required=True)
+    required.add_argument('--sample_id', help='sample_id of the sample', required=True)
 
     optional = parser.add_argument_group('optional input parameters')
     optional.add_argument('--id', help='id of the sample', default="test")
@@ -168,6 +168,7 @@ if __name__ == "__main__":
     optional.add_argument('--picard', help='path to picard executable',
                         default='/home/ubuntu/tools/picard-tools-1.128/picard.jar')
     optional.add_argument('--fastqc_path', help='path to fastqc', default='/home/ubuntu/bin/FastQC/fastqc')
+    optional.add_argument('--metadata_xml', help='metadata in XML format as given by cgquery', default=False)
 
     tophat = parser.add_argument_group("TopHat input parameters")
     tophat.add_argument("--p", type=int, help='No. of threads', default=int(0.8 * multiprocessing.cpu_count()))
@@ -200,7 +201,8 @@ if __name__ == "__main__":
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
-    metadata = extract_metadata(args.outdir, args.metadata_xml, logger)
+    if(args.metadata_xml):
+        metadata = extract_metadata(args.outdir, args.metadata_xml, logger)
 
     #Perform the paired end alignment
     for (rg_id, reads_1, reads_2) in read_group_pairs:
@@ -211,7 +213,7 @@ if __name__ == "__main__":
             os.mkdir(rg_id_dir)
         qc.fastqc(args.fastqc_path, reads_1, reads_2, rg_id_dir, rg_id, logger)
         #    print "Passed FASTQC"
-        tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2, metadata, logger)
+        tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2,logger)
         #else:
         #    logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
 
