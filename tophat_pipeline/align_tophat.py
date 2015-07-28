@@ -10,6 +10,7 @@ import glob
 import re
 import xml.etree.ElementTree as ET
 import qc
+import post_alignment_qc
 
 def get_xml(dirname, analysis_id, logger):
 
@@ -130,7 +131,6 @@ def downstream_steps(output_dir, analysis_id, read_groups, logger):
     """ merge and sort unmapped reads with mapped reads """
 
     out_file_basename = os.path.join(output_dir, analysis_id)
-
     merge_cmd = ['time', '/usr/bin/time', 'samtools', 'merge', '-',]
     for rg_id in read_groups:
         rg_id_dir = os.path.join(output_dir, rg_id)
@@ -141,13 +141,33 @@ def downstream_steps(output_dir, analysis_id, read_groups, logger):
         if os.path.isfile(unmapped_reads):
             merge_cmd.append(unmapped_reads)
 
-    print merge_cmd
     sort_cmd = ['samtools', 'sort','-', out_file_basename]
     start_time = time.time()
     merge = subprocess.Popen(merge_cmd, stdout=subprocess.PIPE)
     sort = subprocess.check_output(sort_cmd, stdin=merge.stdout)
     end_time = time.time()
     logger.info("SAMTOOLS_TIME:%s\t%s" %(analysis_id, (end_time-start_time)/60.0))
+    final_bam = '%s.bam' %out_file_basename
+    if not os.path.isfile(final_bam):
+        raise Exception("Could not merge/sort or find the BAM files")
+    return final_bam
+
+def post_aln_qc(args, bam_file, logger=None):
+    """ perform post alignment quality check """
+
+    #validate the post-alignment BAM file
+    post_alignment_qc.validate_bam_file(args.picard, bam_file, args.id, args.outdir, logger)
+
+    #collect RNA-seq metrics
+    post_alignment_qc.collect_rna_seq_metrics(args.picard, bam_file, args.id,
+                                                args.outdir, args.ref_flat, logger)
+
+    #run rna_seq_qc from broad institute
+    reordered_bam = post_alignment_qc.reorder_bam(args.picard, bam_file, args.id, args.outdir,
+                                                args.ref_genome, logger)
+    post_alignment_qc.bam_index(reordered_bam, args.id, logger)
+    post_alignment_qc.rna_seq_qc(args.rna_seq_qc_path, reordered_bam, args.id, args.outdir, args.ref_genome,
+                args.genome_annotation, logger)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='align_tophat.py', description='RNA-seq alignment using TopHat')
@@ -160,6 +180,12 @@ if __name__ == "__main__":
                         help='path to genome annotation file', required=True)
     required.add_argument('--bowtie2_build_basename', help='path to bowtie2_build', required=True)
     required.add_argument('--sample_id', help='sample_id of the sample', required=True)
+    required.add_argument('--ref_flat', help='Genome annotations in RefFlat format',
+                        default='/home/ubuntu/SCRATCH/grch38/gencode.v21.annotation.ref_flat_final',
+                        required=True)
+    required.add_argument('--ref_genome', help='Reference genome',
+                        default='/home/ubuntu/SCRATCH/grch38/with_decoy/bowtie2_2/bowtie2_buildname.fa',
+                        required=True)
 
     optional = parser.add_argument_group('optional input parameters')
     optional.add_argument('--id', help='id of the sample', default="test")
@@ -169,6 +195,9 @@ if __name__ == "__main__":
                         default='/home/ubuntu/tools/picard-tools-1.128/picard.jar')
     optional.add_argument('--fastqc_path', help='path to fastqc', default='/home/ubuntu/bin/FastQC/fastqc')
     optional.add_argument('--metadata_xml', help='metadata in XML format as given by cgquery', default=False)
+    optional.add_argument('--rna_seq_qc_path', help='path to RNAseq-QC',
+                        default='/home/ubuntu/bin/RNA-SeQC_v1.1.8.jar')
+
 
     tophat = parser.add_argument_group("TopHat input parameters")
     tophat.add_argument("--p", type=int, help='No. of threads', default=int(0.8 * multiprocessing.cpu_count()))
@@ -194,16 +223,13 @@ if __name__ == "__main__":
 
     if not os.path.isdir(args.tmp_dir):
         os.mkdir(args.tmp_dir)
-
     #Unpack the files
     decompress(args.tarfile, args.outdir, args.id, logger)
-
     #Select the fastq reads
     read_group_pairs = scan_workdir(os.path.join(args.outdir))
     read_groups = list()
     if(args.metadata_xml):
         metadata = extract_metadata(args.outdir, args.metadata_xml, logger)
-
     #Perform the paired end alignment
     for (rg_id, reads_1, reads_2) in read_group_pairs:
         read_groups.append(rg_id)
@@ -216,11 +242,12 @@ if __name__ == "__main__":
         tophat_paired(args, rg_id_dir, rg_id, reads_1, reads_2,logger)
         #else:
         #    logger.info("Failed FastQC for %s and %s" %(reads_1, reads_2))
-
     #Merge and sort the resulting BAM
-    downstream_steps(args.outdir, args.id, read_groups, logger)
+    bam_file_name = downstream_steps(args.outdir, args.id, read_groups, logger)
+    #Perform QC checks
+    post_aln_qc(args, bam_file_name, logger)
     #Remove the reads
-    bam_file_name = "%s.bam" % os.path.join(args.outdir, args.id)
+    #bam_file_name = "%s.bam" % os.path.join(args.outdir, args.id)
     if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
         for (rg_id, reads_1, reads_2) in read_group_pairs:
             pass
