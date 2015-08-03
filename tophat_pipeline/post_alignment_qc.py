@@ -63,6 +63,25 @@ def rna_seq_qc(rna_seq_qc_path, bam_file, uuid, outdir, ref_genome, gtf, logger=
         pipelineUtil.log_function_time('RNAseq_qc', uuid, cmd, logger)
     else:
         raise Exception("Invalid path to rnaseq-qc or bam")
+
+def add_or_replace_read_group(picard_path, bam_file,  outdir, uuid, rg_id, rg_lb="Unknown", rg_pl="Unknown",
+                            rg_pu="Unknown",rg_sm="Unknown", logger=None):
+    outbam = '%s.addRG.bam' %os.path.join(outdir, uuid)
+    if os.path.isfile(bam_file) and os.path.isfile(picard_path):
+        tmp_dir = os.path.join(outdir, 'tmp')
+        if not os.path.isdir(tmp_dir):
+            os.mkdir(tmp_dir)
+        cmd = ['java', '-jar', picard_path, 'AddOrReplaceReadGroups', 'I=%s' %bam_file, 'O=%s' %outbam,
+                'RGID=%s'%rg_id, 'RGLB=%s' %rg_lb, 'RGPL=%s' %rg_pl, 'RGPU=%s' %rg_pu, 'RGSM=%s' %rg_sm,
+                'VALIDATION_STRINGENCY=LENIENT','TMP_DIR=%s' %tmp_dir]
+        pipelineUtil.log_function_time('AddOrReplaceReadGroups', uuid, cmd, logger)
+    print outbam
+    if os.path.isfile(outbam):
+        print "returning file now %s" %outbam
+        return outbam
+    else:
+        raise Exception('Could not add or replace read groups. Check log file for errors')
+
 """
 picard_path="/home/ubuntu/tools/picard-tools-1.136/picard.jar"
 bam_file="/home/ubuntu/SCRATCH/test_1/trial.reorder.bam"

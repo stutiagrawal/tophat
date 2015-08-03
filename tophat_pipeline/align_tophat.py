@@ -133,9 +133,12 @@ def downstream_steps(output_dir, analysis_id, read_groups, logger):
     out_file_basename = os.path.join(output_dir, analysis_id)
     merge_cmd = ['time', '/usr/bin/time', 'samtools', 'merge', '-',]
     for rg_id in read_groups:
+
         rg_id_dir = os.path.join(output_dir, rg_id)
         mapped_reads = os.path.join(rg_id_dir, 'accepted_hits.bam')
-        unmapped_reads = os.path.join(rg_id_dir, 'unmapped.bam')
+        unaligned_reads = os.path.join(rg_id_dir, 'unmapped.bam')
+        unmapped_reads = post_alignment_qc.add_or_replace_read_group(args.picard, unaligned_reads,
+                                                                    rg_id_dir, rg_id, rg_id, logger=logger)
         if os.path.isfile(mapped_reads):
             merge_cmd.append(mapped_reads)
         if os.path.isfile(unmapped_reads):
@@ -217,9 +220,9 @@ if __name__ == "__main__":
                         default='/home/ubuntu/SCRATCH/grch38/with_decoy/transcriptome_index')
     args = parser.parse_args()
 
-    log_file = "%s.log" % os.path.join(args.outdir, "%s_1" %args.id)
+    log_file = "%s.log" % os.path.join(args.outdir, "%s_2" %args.id)
 
-    logger = setupLog.setup_logging(logging.INFO, "%s_1" %args.id, log_file)
+    logger = setupLog.setup_logging(logging.INFO, "%s_2" %args.id, log_file)
 
     if not os.path.isdir(args.tmp_dir):
         os.mkdir(args.tmp_dir)
@@ -247,7 +250,7 @@ if __name__ == "__main__":
     #Perform QC checks
     post_aln_qc(args, bam_file_name, logger)
     #Remove the reads
-    #bam_file_name = "%s.bam" % os.path.join(args.outdir, args.id)
+    bam_file_name = "%s.bam" % os.path.join(args.outdir, args.id)
     if os.path.isfile(bam_file_name) and os.path.getsize(bam_file_name):
         for (rg_id, reads_1, reads_2) in read_group_pairs:
             pass
