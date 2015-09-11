@@ -64,8 +64,7 @@ def rna_seq_qc(rna_seq_qc_path, bam_file, uuid, outdir, ref_genome, gtf, logger=
     else:
         raise Exception("Invalid path to rnaseq-qc or bam")
 
-def add_or_replace_read_group(picard_path, bam_file,  outdir, uuid, rg_id, rg_lb="Unknown", rg_pl="Unknown",
-                            rg_pu="Unknown",rg_sm="Unknown", logger=None):
+def add_or_replace_read_group(picard_path, bam_file,  outdir, uuid, rg_id, rg_lb="Unknown", rg_pl="Unknown", rg_pu="Unknown",rg_sm="Unknown", logger=None):
     outbam = '%s.addRG.bam' %os.path.join(outdir, uuid)
     if os.path.isfile(bam_file) and os.path.isfile(picard_path):
         tmp_dir = os.path.join(outdir, 'tmp')
